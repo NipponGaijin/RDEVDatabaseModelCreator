@@ -73,6 +73,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Classes\RdevField.cs" />
+    <Compile Include="Classes\RdevTypes.cs" />
+    <Compile Include="Classes\RdevTable.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>

@@ -6,12 +6,17 @@ using System.Threading.Tasks;
 
 namespace RDEVDatabaseModelCreator.Classes
 {
-    public class Field
+    public class RdevTable
     {
         public string Name { get; set; }
 
         public string DisplayName { get; set; }
 
-        public RdevTypes Type { get; set; }
+        public List<RdevField> Fields { get; set; } = new List<RdevField>();
+
+        public void AddField(RdevField field)
+        {
+            Fields.Add(field);
+        }
     }
 }
