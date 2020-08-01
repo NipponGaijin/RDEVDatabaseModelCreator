@@ -1,7 +1,9 @@
-﻿using Mono.CSharp;
+﻿using Microsoft.CSharp;
 using Newtonsoft.Json.Linq;
 using RDEVDatabaseModelCreator.Classes;
 using System;
+using System.CodeDom;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -19,7 +21,7 @@ namespace RDEVDatabaseModelCreator
         JObject _projectFile;
         JObject _sysProjectFile;
         string _outputFolderPath;
-        string _openedFolder;
+        string _openedFolder = "";
 
         string[] exceptionTableNames = {
             "RDEV___Auth_Data_Policies"
@@ -40,7 +42,7 @@ namespace RDEVDatabaseModelCreator
         /// Создать строку лога и записать ее в форму лога
         /// </summary>
         /// <param name="message"></param>
-        private void GenerateLogString(string message)
+        public void GenerateLogString(string message)
         {
             infoTxt.AppendText($"{DateTime.Now} || {message}{Environment.NewLine}");
         }
@@ -213,8 +215,59 @@ namespace RDEVDatabaseModelCreator
                 GenerateLogString($"Таблицы успешно обработаны");
             }
 
+            ModelBuilder modelBuilder = new ModelBuilder(rdevTables, this);
+            CodeCompileUnit model = modelBuilder.Build();
+
+            string generatedCOde = GenerateCSharpCode(model);
+
         }
 
+        /// <summary>
+        /// Генерация c# кода
+        /// </summary>
+        /// <param name="compileunit"></param>
+        /// <returns></returns>
+        private string GenerateCSharpCode(CodeCompileUnit compileunit)
+        {
+            GenerateLogString($"Генерация файла с кодом");
+            // Generate the code with the C# code provider.
+            CSharpCodeProvider provider = new CSharpCodeProvider();
+
+            // Build the output file name.
+            string sourceFile;
+            if (provider.FileExtension[0] == '.')
+            {
+                sourceFile = "DatabaseModel" + provider.FileExtension;
+            }
+            else
+            {
+                sourceFile = "DatabaseModel." + provider.FileExtension;
+            }
+
+            sourceFile = Path.Combine(_openedFolder, sourceFile);
+
+            // Create a TextWriter to a StreamWriter to the output file.
+            using (StreamWriter sw = new StreamWriter(sourceFile, false))
+            {
+                IndentedTextWriter tw = new IndentedTextWriter(sw, "    ");
+
+                // Generate source code using the code provider.
+                provider.GenerateCodeFromCompileUnit(compileunit, tw,
+                    new CodeGeneratorOptions());
+
+                // Close the output file.
+                tw.Close();
+            }
+            GenerateLogString($"Файл с кодом сгенерирован, путь: '{sourceFile}'");
+            return sourceFile;
+        }
+
+        /// <summary>
+        /// Обработка таблиц рдева
+        /// </summary>
+        /// <param name="tables">Таблицы</param>
+        /// <param name="types">Типы</param>
+        /// <returns></returns>
         private List<RdevTable> ProcessRdevTables(JToken tables, JToken types)
         {
             List<RdevTable> res = new List<RdevTable>();
@@ -244,6 +297,13 @@ namespace RDEVDatabaseModelCreator
             return res;
         }
 
+        /// <summary>
+        /// Обработка таблицы рдева
+        /// </summary>
+        /// <param name="table">обрабатываемамя таблица</param>
+        /// <param name="tables">Таблицы</param>
+        /// <param name="types">типы</param>
+        /// <returns></returns>
         private List<RdevTable> ProcessRdevTable(JToken table, JToken tables, JToken types)
         {
             List<RdevTable> rdevTables = new List<RdevTable>();
@@ -285,6 +345,16 @@ namespace RDEVDatabaseModelCreator
                     {
                         relation = type["relation"];
                     }
+                    else if(rdevField.Type == RdevType.RdevTypes.SysENUM)
+                    {
+                        List<RdevEnumItem> rdevEnum = type["enum"].ToObject<List<RdevEnumItem>>();
+                        if(rdevEnum == null)
+                        {
+                            GenerateLogString($"Не найдена структура enum типа '{type["name"]}' поля '{field["name"]}', таблицы '{table["name"]}'");
+                            return null;
+                        }
+                        rdevField.Enum = rdevEnum;
+                    }
                 }
                 else if (RdevType.GetType(field.Value<string>("type")) != null)
                 {
@@ -300,6 +370,16 @@ namespace RDEVDatabaseModelCreator
                     {
                         relation = field["relation"];
                     }
+                    else if(rdevField.Type == RdevType.RdevTypes.SysENUM)
+                    {
+                        List<RdevEnumItem> rdevEnum = field["enum"].ToObject<List<RdevEnumItem>>();
+                        if (rdevEnum == null)
+                        {
+                            GenerateLogString($"Не найдена структура enum поля '{field["name"]}', таблицы '{table["name"]}'");
+                            return null;
+                        }
+                        rdevField.Enum = rdevEnum;
+                    }
                 }
                 else
                 {
@@ -307,6 +387,7 @@ namespace RDEVDatabaseModelCreator
                     {
                         { "table", "SysBaseTable" }
                     };
+                    rdevField.Type = RdevType.RdevTypes.SysRelation;
                 }
 
                 if (relation != null)
@@ -330,7 +411,7 @@ namespace RDEVDatabaseModelCreator
                                 {
                                     rdevTables.Add(tab);
                                 }
-                                if (tab.Name == relation.Value<string>("table"))
+                                if (tab.Name.ToLower() == relation.Value<string>("table").ToLower())
                                 {
                                     rdevField.RelatedTable = tab;
                                 }
@@ -356,6 +437,7 @@ namespace RDEVDatabaseModelCreator
                         
                     }
                 }
+
                 rdevTable.AddField(rdevField);
             }
 

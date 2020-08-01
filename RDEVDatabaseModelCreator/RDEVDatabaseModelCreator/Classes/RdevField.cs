@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,5 +17,17 @@ namespace RDEVDatabaseModelCreator.Classes
         public RdevTypes? Type { get; set; }
 
         public RdevTable RelatedTable { get; set; }
+
+        public List<RdevEnumItem> Enum { get; set; }
+
+    }
+
+    public class RdevEnumItem
+    {
+        [JsonProperty("id")]
+        public int Id { get; set; }
+
+        [JsonProperty("value")]
+        public string Value { get; set; }
     }
 }
