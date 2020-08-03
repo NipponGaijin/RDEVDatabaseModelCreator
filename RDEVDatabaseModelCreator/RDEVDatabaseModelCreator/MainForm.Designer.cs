@@ -35,6 +35,8 @@
             this.infoTxt = new System.Windows.Forms.TextBox();
             this.openedFolderTxt = new System.Windows.Forms.TextBox();
             this.buildObjectModelBtn = new System.Windows.Forms.Button();
+            this.namespaceLbl = new System.Windows.Forms.Label();
+            this.namespaceTxt = new System.Windows.Forms.TextBox();
             this.menuStrip1.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -60,14 +62,14 @@
             // открытьToolStripMenuItem
             // 
             this.открытьToolStripMenuItem.Name = "открытьToolStripMenuItem";
-            this.открытьToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.открытьToolStripMenuItem.Size = new System.Drawing.Size(133, 22);
             this.открытьToolStripMenuItem.Text = "Открыть";
             this.открытьToolStripMenuItem.Click += new System.EventHandler(this.OpenFileMenuItem_Click);
             // 
             // сохранитьToolStripMenuItem
             // 
             this.сохранитьToolStripMenuItem.Name = "сохранитьToolStripMenuItem";
-            this.сохранитьToolStripMenuItem.Size = new System.Drawing.Size(180, 22);
+            this.сохранитьToolStripMenuItem.Size = new System.Drawing.Size(133, 22);
             this.сохранитьToolStripMenuItem.Text = "Сохранить";
             this.сохранитьToolStripMenuItem.Click += new System.EventHandler(this.SaveFileMenuItem_Click);
             // 
@@ -93,20 +95,39 @@
             // 
             // buildObjectModelBtn
             // 
-            this.buildObjectModelBtn.Location = new System.Drawing.Point(12, 71);
+            this.buildObjectModelBtn.Location = new System.Drawing.Point(12, 94);
             this.buildObjectModelBtn.Name = "buildObjectModelBtn";
-            this.buildObjectModelBtn.Size = new System.Drawing.Size(776, 245);
+            this.buildObjectModelBtn.Size = new System.Drawing.Size(776, 222);
             this.buildObjectModelBtn.TabIndex = 3;
             this.buildObjectModelBtn.TabStop = false;
             this.buildObjectModelBtn.Text = "Сформировать объектную модель";
             this.buildObjectModelBtn.UseVisualStyleBackColor = true;
             this.buildObjectModelBtn.Click += new System.EventHandler(this.buildObjectModelBtn_Click);
             // 
+            // namespaceLbl
+            // 
+            this.namespaceLbl.AutoSize = true;
+            this.namespaceLbl.Location = new System.Drawing.Point(12, 73);
+            this.namespaceLbl.Name = "namespaceLbl";
+            this.namespaceLbl.Size = new System.Drawing.Size(62, 13);
+            this.namespaceLbl.TabIndex = 4;
+            this.namespaceLbl.Text = "namespace";
+            // 
+            // namespaceTxt
+            // 
+            this.namespaceTxt.Location = new System.Drawing.Point(80, 70);
+            this.namespaceTxt.Name = "namespaceTxt";
+            this.namespaceTxt.Size = new System.Drawing.Size(708, 20);
+            this.namespaceTxt.TabIndex = 5;
+            this.namespaceTxt.Text = "LicenseLogicPlugin.Models.DatabaseModels";
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.namespaceTxt);
+            this.Controls.Add(this.namespaceLbl);
             this.Controls.Add(this.buildObjectModelBtn);
             this.Controls.Add(this.openedFolderTxt);
             this.Controls.Add(this.infoTxt);
@@ -131,6 +152,8 @@
         private System.Windows.Forms.ToolStripMenuItem сохранитьToolStripMenuItem;
         private System.Windows.Forms.TextBox openedFolderTxt;
         private System.Windows.Forms.Button buildObjectModelBtn;
+        private System.Windows.Forms.Label namespaceLbl;
+        private System.Windows.Forms.TextBox namespaceTxt;
     }
 }
 

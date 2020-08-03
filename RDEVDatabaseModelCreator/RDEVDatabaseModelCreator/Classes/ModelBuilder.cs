@@ -1,7 +1,9 @@
 ﻿using System;
 using System.CodeDom;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Drawing.Design;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -25,7 +27,7 @@ namespace RDEVDatabaseModelCreator.Classes
             _tables = tables;
             modelObject = new CodeCompileUnit();
             
-            modelClass = new CodeTypeDeclaration("Model");
+            modelClass = new CodeTypeDeclaration("RdevDatabaseModel");
             modelClass.IsClass = true;
             modelClass.TypeAttributes = TypeAttributes.Public;
 
@@ -33,17 +35,29 @@ namespace RDEVDatabaseModelCreator.Classes
 
         }
 
-        public CodeCompileUnit Build()
+        public CodeCompileUnit Build(string nameSpace)
         {
+            //Получение классов из файла RdevTypes.cs
+
+            string solutionPath = Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.Parent.FullName;
+            string rdevTypesPath = Path.Combine(solutionPath, "RDEVDatabaseModelCreator\\RDEVDatabaseModelCreator\\Classes\\RdevSupport.cs");
+            CodeSnippetTypeMember rdevTypes = ParseFromFile(rdevTypesPath);
+
             GenerateTablesNames();
-            CodeNamespace codeNamespace = new CodeNamespace("RdevDatabaseModels");
+            CodeNamespace codeNamespace = new CodeNamespace(nameSpace);
+
+            codeNamespace.Imports.Add(new CodeNamespaceImport("System"));
+            codeNamespace.Imports.Add(new CodeNamespaceImport("System.Collections.Generic"));
+            codeNamespace.Imports.Add(new CodeNamespaceImport("Newtonsoft.Json"));
 
             //Получение основной таблицы, от которой будут наследоваться другие
             RdevTable sysBaseTable = _tables.Find(x => x.Name == "SysBaseTable");
             CodeTypeDeclaration sysBaseTableClass = GenerateTableClass(sysBaseTable);
+            sysBaseTableClass.Attributes = MemberAttributes.Private;
             modelClass.Members.Add(sysBaseTableClass);
             _tables.Remove(sysBaseTable);
 
+            //Формирование кода для остальных таблиц
             foreach (RdevTable table in _tables)
             {
                 CodeTypeDeclaration tableClass = GenerateTableClass(table);
@@ -52,6 +66,9 @@ namespace RDEVDatabaseModelCreator.Classes
 
                 modelClass.Members.Add(tableClass);
             }
+
+            modelClass.Members.Add(rdevTypes);
+
             codeNamespace.Types.Add(modelClass);
             modelObject.Namespaces.Add(codeNamespace);
             return modelObject;
@@ -96,6 +113,7 @@ namespace RDEVDatabaseModelCreator.Classes
             
             CodeTypeDeclaration tableClass = new CodeTypeDeclaration(tableName);
             tableClass.Attributes = MemberAttributes.Public;
+            tableClass.CustomAttributes.Add(new CodeAttributeDeclaration("RdevTableInfo", new CodeAttributeArgument(new CodePrimitiveExpression(table.Name))));
 
             //Создание документационных комментов
             tableClass.Comments.Add(new CodeCommentStatement("<summary>", true));
@@ -138,45 +156,55 @@ namespace RDEVDatabaseModelCreator.Classes
                 //Генерация типа поля
                 uiForm.GenerateLogString($"Генерация типа для поля '{field.Name}', имя в таблице '{fieldName}'");
 
-                Type fieldType;
+                List<string> customAttributes = new List<string>();
+
                 switch (field.Type)
                 {
                     case RdevTypes.SysString:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysString]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic string {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysInt:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysInt]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic int? {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysRelation:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysRelation]})");
                         var relatedTable = field.RelatedTable;
                         var relatedTableName = tableNames[relatedTable.Name];
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic {relatedTableName} {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysDate:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysDate]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic DateTime? {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysTimeDate:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysTimeDate]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic DateTime? {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysFile:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysFile]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic string {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysBoolean:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysBoolean]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic bool? {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysGUID:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysGUID]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic Guid? {fieldName} {{ get; set; }}";
                         break;
                     case RdevTypes.SysENUM:
-                        
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysENUM]})");
+
                         List<RdevEnumItem> fieldEnumItems = field.Enum;
 
                         List<string> enumCodeStrings = new List<string>();
@@ -190,13 +218,18 @@ namespace RDEVDatabaseModelCreator.Classes
                         generatedField.Text = $"\t\t\tpublic Dictionary<int, string> {fieldName} = new Dictionary<int, string> {{\n{string.Join(", ", enumCodeStrings)}\n}};";
                         break;
                     case RdevTypes.SysNumber:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysNumber]})");
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic int? {fieldName} {{ get; set; }}";
                         break;
                 }
                 //Генерация атрибута
                 uiForm.GenerateLogString($"Генерация атрибута [JsonProperty(\"{field.Name}\")] для поля '{field.Name}', имя в таблице '{fieldName}'");
-                generatedField.Text = $"\t\t\t[JsonProperty(\"{field.Name}\")]\r\n{generatedField.Text}";
+                customAttributes.Add($"JsonProperty(\"{field.Name}\")");
+
+                uiForm.GenerateLogString($"Генерация атрибутов для поля '{field.Name}', имя в таблице '{fieldName}'");
+
+                generatedField.Text = $"\t\t\t[{string.Join(", ", customAttributes)}]\r\n{generatedField.Text}";
 
                 //Создание документационных комментов
                 uiForm.GenerateLogString($"Генерация документационных комментов для поля '{field.Name}', имя в таблице '{fieldName}'");
@@ -245,6 +278,17 @@ namespace RDEVDatabaseModelCreator.Classes
             }
 
             return res;
+        }
+
+        /// <summary>
+        /// Получить класс из файла
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <returns></returns>
+        private CodeSnippetTypeMember ParseFromFile(string filename)
+        {
+            string sourceCode = File.OpenText(filename).ReadToEnd();
+            return new CodeSnippetTypeMember(sourceCode);
         }
     }
 }

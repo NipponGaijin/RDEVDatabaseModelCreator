@@ -1,27 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿
+using RDEVDatabaseModelCreator.Classes;
 
 namespace RDEVDatabaseModelCreator
 {
     public abstract class RdevType
     {
-        public enum RdevTypes
-        {
-            SysString,
-            SysInt,
-            SysRelation,
-            SysDate,
-            SysTimeDate,
-            SysFile,
-            SysBoolean,
-            SysGUID,
-            SysENUM,
-            SysNumber
-        }
-
         public static RdevTypes? GetType(string rdevType)
         {
             switch (rdevType)

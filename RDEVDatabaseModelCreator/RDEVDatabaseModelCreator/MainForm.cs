@@ -168,6 +168,13 @@ namespace RDEVDatabaseModelCreator
                 return;
             }
 
+            if (string.IsNullOrEmpty(namespaceTxt.Text))
+            {
+                MessageBox.Show("Не указан namespace!");
+                GenerateLogString($"Не указан namespace!");
+                return;
+            }
+
             //Формирование объектной модели
             BuildObjectModel();
         }
@@ -216,7 +223,7 @@ namespace RDEVDatabaseModelCreator
             }
 
             ModelBuilder modelBuilder = new ModelBuilder(rdevTables, this);
-            CodeCompileUnit model = modelBuilder.Build();
+            CodeCompileUnit model = modelBuilder.Build(namespaceTxt.Text);
 
             string generatedCOde = GenerateCSharpCode(model);
 
@@ -333,6 +340,11 @@ namespace RDEVDatabaseModelCreator
 
                 if (type != null)
                 {
+                    if(type.Value<bool?>("isCalculated") == true)
+                    {
+                        continue;
+                    }
+
                     rdevField.Type = RdevType.GetType(type.Value<string>("type"));
 
                     if (rdevField.Type == null)
@@ -341,11 +353,11 @@ namespace RDEVDatabaseModelCreator
                         return null;
                     }
 
-                    if (rdevField.Type == RdevType.RdevTypes.SysRelation)
+                    if (rdevField.Type == RdevTypes.SysRelation)
                     {
                         relation = type["relation"];
                     }
-                    else if(rdevField.Type == RdevType.RdevTypes.SysENUM)
+                    else if(rdevField.Type == RdevTypes.SysENUM)
                     {
                         List<RdevEnumItem> rdevEnum = type["enum"].ToObject<List<RdevEnumItem>>();
                         if(rdevEnum == null)
@@ -358,6 +370,11 @@ namespace RDEVDatabaseModelCreator
                 }
                 else if (RdevType.GetType(field.Value<string>("type")) != null)
                 {
+                    if (field.Value<bool?>("isCalculated") == true)
+                    {
+                        continue;
+                    }
+
                     rdevField.Type = RdevType.GetType(field.Value<string>("type"));
 
                     if (rdevField.Type == null)
@@ -366,11 +383,11 @@ namespace RDEVDatabaseModelCreator
                         return null;
                     }
 
-                    if (rdevField.Type == RdevType.RdevTypes.SysRelation)
+                    if (rdevField.Type == RdevTypes.SysRelation)
                     {
                         relation = field["relation"];
                     }
-                    else if(rdevField.Type == RdevType.RdevTypes.SysENUM)
+                    else if(rdevField.Type == RdevTypes.SysENUM)
                     {
                         List<RdevEnumItem> rdevEnum = field["enum"].ToObject<List<RdevEnumItem>>();
                         if (rdevEnum == null)
@@ -383,11 +400,7 @@ namespace RDEVDatabaseModelCreator
                 }
                 else
                 {
-                    relation = new JObject
-                    {
-                        { "table", "SysBaseTable" }
-                    };
-                    rdevField.Type = RdevType.RdevTypes.SysRelation;
+                    continue;
                 }
 
                 if (relation != null)
