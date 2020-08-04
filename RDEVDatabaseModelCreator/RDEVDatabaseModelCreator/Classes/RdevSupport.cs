@@ -1,4 +1,13 @@
-﻿public enum RdevTypes
+﻿/*
+ * Набор объектов, предоставляемых вместе с объектной моделью БД
+ * Для работы с объеткной моделью необходимо создать экземпляр класса RdevDatabaseContext
+ * все типы наследуются от системной таблицы рдева
+ */
+
+/// <summary>
+/// Типы рдева
+/// </summary>
+public enum RdevTypes
 {
     SysString,
     SysInt,
@@ -9,9 +18,13 @@
     SysBoolean,
     SysGUID,
     SysENUM,
-    SysNumber
+    SysNumber,
+    SysDecimal
 }
 
+/// <summary>
+/// Информация о типах рдева для формирования атрибутов
+/// </summary>
 public static class RdevTypesInfo
 {
     public static System.Collections.Generic.Dictionary<RdevTypes, string> rdevTypesInfo = new System.Collections.Generic.Dictionary<RdevTypes, string>
@@ -25,10 +38,14 @@ public static class RdevTypesInfo
         { RdevTypes.SysBoolean, "RdevTypes.SysBoolean"},
         { RdevTypes.SysGUID, "RdevTypes.SysGUID"},
         { RdevTypes.SysENUM, "RdevTypes.SysENUM"},
-        { RdevTypes.SysNumber, "RdevTypes.SysNumber"}
+        { RdevTypes.SysNumber, "RdevTypes.SysNumber"},
+        { RdevTypes.SysDecimal, "RdevTypes.SysDecimal" }
     };
 }
 
+/// <summary>
+/// Арибут системного типа рдева
+/// </summary>
 public class RdevTypeAttribute : System.Attribute
 {
     private RdevTypes type;
@@ -44,6 +61,9 @@ public class RdevTypeAttribute : System.Attribute
     }
 }
 
+/// <summary>
+/// Атрибут информации о таблице рдева 
+/// </summary>
 public class RdevTableInfo : System.Attribute
 {
     private string tableName;
@@ -57,6 +77,57 @@ public class RdevTableInfo : System.Attribute
     {
         return this.tableName;
     }
+}
+
+/// <summary>
+/// Контейнер для параметров insert запроса
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class InsertQueryParams<T>
+{
+    public string Keys { get; set; }
+    public string Values { get; set; }
+    public System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> SqlParameters { get; set; }
+
+    public T InsertObject {get; set;}
+
+    public InsertQueryParams(System.Collections.Generic.List<System.String> keys, System.Collections.Generic.List<System.String> values, System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> sqlParameters, T insertObject)
+    {
+        this.Keys = System.String.Join(", ", keys);
+        this.Values = System.String.Join(", ", values);
+        this.SqlParameters = sqlParameters;
+        this.InsertObject = insertObject;
+    }
+}
+
+/// <summary>
+/// Контейнер для параметров update запроса
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class UpdateQueryParams<T>
+{
+    public System.Guid RecId { get; set; }
+    public string QueryParams { get; set; }
+    public System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> SqlParameters { get; set; }
+
+    public T UpdateObject { get; set; }
+
+    public UpdateQueryParams(System.Guid recId, System.Collections.Generic.List<string> queryParams, System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> sqlParameters, T updateObject)
+    {
+        RecId = recId;
+        QueryParams = string.Join(", ", queryParams);
+        SqlParameters = sqlParameters;
+        UpdateObject = updateObject;
+    }
+}
+
+/// <summary>
+/// Тип сортировки в запросах
+/// </summary>
+public enum OrderByType
+{
+    Asc = 0,
+    Desc = 1
 }
 
 /// <summary> 
@@ -87,16 +158,670 @@ public class RdevDatabaseContext
     /// <typeparam name="T"></typeparam>
     /// <param name="recid"></param>
     /// <returns></returns>
-    public T FindByRecid<T>(System.Guid recid) where T : new ()
+    public T FindByRecid<T>(System.Guid recid) where T : new()
     {
         return FindByRecidStatic<T>(recid, connection);
     }
 
     /// <summary>
-    /// Найти запись по Recid
+    /// Найти запись по выражению Where
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    /// <param name="recid"></param>
+    /// <param name="whereStatement"></param>
+    /// <returns></returns>
+    public System.Collections.Generic.List<T> FindByParams<T>(System.String whereStatement) where T : new()
+    {
+        RdevTableInfo tableInfo = (RdevTableInfo)System.Attribute.GetCustomAttribute(typeof(T), typeof(RdevTableInfo));
+
+        var recordList = new Newtonsoft.Json.Linq.JArray();
+        System.Collections.Generic.List<T> result = new System.Collections.Generic.List<T>();
+        using (var command = new Npgsql.NpgsqlCommand($"SELECT * FROM {tableInfo.GetTableName()} WHERE {whereStatement} AND recstate = 1"))
+        {
+            command.Connection = this.connection;
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var record = GetDataFromReader(reader);
+
+                    recordList.Add(record);
+                }
+            }
+        }
+        
+        if(recordList.Count <= 0)
+        {
+            return result;
+        }
+
+        foreach(Newtonsoft.Json.Linq.JToken record in recordList)
+        {
+            try
+            {
+                T databaseObject = FillDatabaseObjectProperties<T>(record, connection);
+                result.Add(databaseObject);
+            } 
+            catch (FillDatabaseObjectPropertiesException e)
+            {
+                throw new FindByParamsException(e.Message);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Найти записи по выражению
+    /// </summary>
+    /// <typeparam name="T">Тип записи</typeparam>
+    /// <param name="whereStatement">Выражение по которому происходит выборка</param>
+    /// <param name="orderByField">Название поля, по которому идет сортировка</param>
+    /// <param name="orderBy">Тип сортировки</param>
+    /// <returns></returns>
+    public System.Collections.Generic.List<T> FindByParams<T>(System.String whereStatement, System.String orderByField, OrderByType orderBy) where T : new()
+    {
+        string orderByStatement = orderBy == 0 ? $"{orderByField} ASC" : $"{orderByField} DESC";
+        //Получение данных из талицы
+        RdevTableInfo tableInfo = (RdevTableInfo)System.Attribute.GetCustomAttribute(typeof(T), typeof(RdevTableInfo));
+
+        var recordList = new Newtonsoft.Json.Linq.JArray();
+        System.Collections.Generic.List<T> result = new System.Collections.Generic.List<T>();
+        using (var command = new Npgsql.NpgsqlCommand($"SELECT * FROM {tableInfo.GetTableName()} WHERE {whereStatement} AND recstate = 1 ORDER BY {orderByStatement}"))
+        {
+            command.Connection = this.connection;
+            using (var reader = command.ExecuteReader())
+            {
+                while (reader.Read())
+                {
+                    var record = GetDataFromReader(reader);
+
+                    recordList.Add(record);
+                }
+            }
+        }
+
+        if (recordList.Count <= 0)
+        {
+            return result;
+        }
+
+        foreach (Newtonsoft.Json.Linq.JToken record in recordList)
+        {
+            try
+            {
+                T databaseObject = FillDatabaseObjectProperties<T>(record, connection);
+                result.Add(databaseObject);
+            }
+            catch (FillDatabaseObjectPropertiesException e)
+            {
+                throw new FindByParamsException(e.Message);
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Создание записи в БД
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="insertObject"></param>
+    /// <returns></returns>
+    public T Insert<T>(T insertObject)
+    {
+        RdevTableInfo tableInfo = (RdevTableInfo)System.Attribute.GetCustomAttribute(typeof(T), typeof(RdevTableInfo));
+        if(tableInfo == null)
+        {
+            throw new InsertException("Не удалось получить информацию о таблице");
+        }
+
+        InsertQueryParams<T> insertQueryParams = PrepareInsertQueryParams(insertObject);
+
+        try
+        {
+            using (var command = new Npgsql.NpgsqlCommand($"INSERT INTO {tableInfo.GetTableName()} ({insertQueryParams.Keys}) VALUES ({insertQueryParams.Values})"))
+            {
+                if (insertQueryParams.SqlParameters.Count > 0)
+                {
+                    foreach (System.Data.SqlClient.SqlParameter parameter in insertQueryParams.SqlParameters)
+                    {
+                        command.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
+                    }
+                }
+                command.Connection = this.connection;
+                command.Transaction = this.transaction;
+                int rowsCount = command.ExecuteNonQuery();
+                return insertQueryParams.InsertObject;
+            }
+        }
+        catch (System.Exception e)
+        {
+            throw new InsertException(e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Обновление записи в БД
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="updateObject">Объект для обновления</param>
+    /// <returns></returns>
+    public T Update<T>(T updateObject)
+    {
+        System.Reflection.PropertyInfo[] properties = typeof(T).GetProperties();
+        foreach(var prop in properties)
+        {
+            //Получение атрибута JsonProperty
+            Newtonsoft.Json.JsonPropertyAttribute[] propJsonAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+            if (propJsonAttrs.Length <= 0)
+            {
+                throw new UpdateException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
+            }
+            Newtonsoft.Json.JsonPropertyAttribute propJsonAttr = propJsonAttrs[0];
+
+            if(propJsonAttr.PropertyName == "recid")
+            {
+                object propValue = prop.GetValue(updateObject, null);
+                if(propValue != null)
+                {
+                    return Update(updateObject, (System.Guid)propValue);
+                }
+                else
+                {
+                    throw new UpdateException("Свойство Recid не может быть равным null");
+                }
+            }
+        }
+        throw new UpdateException("Не удалось получить свойство Recid обновляемого объекта");
+    }
+
+    /// <summary>
+    /// Обновление записи в БД
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="updateObject">Объект для обновления</param>
+    /// <param name="recordId">Идентификатор записи длят обновления</param>
+    /// <returns></returns>
+    public T Update<T>(T updateObject, System.Guid recordId)
+    {
+        RdevTableInfo tableInfo = (RdevTableInfo)System.Attribute.GetCustomAttribute(typeof(T), typeof(RdevTableInfo));
+        if (tableInfo == null)
+        {
+            throw new UpdateException("Не удалось получить информацию о таблице");
+        }
+
+        UpdateQueryParams<T> updateQueryParams = PrepareUpdateQueryParams(updateObject);
+
+        try
+        {
+            using (var command = new Npgsql.NpgsqlCommand($"UPDATE {tableInfo.GetTableName()} SET {updateQueryParams.QueryParams} WHERE recid = '{recordId.ToString()}'"))
+            {
+                command.Connection = this.connection;
+                command.Transaction = this.transaction;
+                int rowsCount = command.ExecuteNonQuery();
+                return updateQueryParams.UpdateObject;
+            }
+        }
+        catch (System.Exception e)
+        {
+            throw new UpdateException(e.Message);
+        }
+    }
+
+    /// <summary>
+    /// Удаление записи из БД
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="deleteObject"></param>
+    /// <returns></returns>
+    public int Delete<T>(T deleteObject)
+    {
+        RdevTableInfo tableInfo = (RdevTableInfo)System.Attribute.GetCustomAttribute(typeof(T), typeof(RdevTableInfo));
+        if (tableInfo == null)
+        {
+            throw new DeleteException("Не удалось получить информацию о таблице");
+        }
+
+        System.Reflection.PropertyInfo[] properties = typeof(T).GetProperties();
+        foreach (var prop in properties)
+        {
+            //Получение атрибута JsonProperty
+            Newtonsoft.Json.JsonPropertyAttribute[] propJsonAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+            if (propJsonAttrs.Length <= 0)
+            {
+                throw new DeleteException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
+            }
+            Newtonsoft.Json.JsonPropertyAttribute propJsonAttr = propJsonAttrs[0];
+
+            if (propJsonAttr.PropertyName == "recid")
+            {
+                object propValue = prop.GetValue(deleteObject, null);
+                if (propValue != null)
+                {
+                    try
+                    {
+                        using (var command = new Npgsql.NpgsqlCommand($"DELETE FROM {tableInfo.GetTableName()} WHERE recid = '{propValue}'"))
+                        {
+                            command.Connection = this.connection;
+                            command.Transaction = this.transaction;
+                            int rowsCount = command.ExecuteNonQuery();
+                            return rowsCount;
+                        }
+                    }
+                    catch (System.Exception e)
+                    {
+                        throw new DeleteException(e.Message);
+                    }
+                }
+                else
+                {
+                    throw new DeleteException("Свойство Recid не может быть равным null");
+                }
+            }
+        }
+        throw new DeleteException("Не удалось получить свойство Recid обновляемого объекта");
+    }
+
+    /// <summary>
+    /// Генерация параметров insert запроса
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="insertObject"></param>
+    /// <returns></returns>
+    private InsertQueryParams<T> PrepareInsertQueryParams<T>(T insertObject)
+    {
+        System.Collections.Generic.List<string> keys = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<string> values = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> queryParams = new System.Collections.Generic.List<System.Data.SqlClient.SqlParameter>();
+
+        //Получение свойств объекта
+        System.Reflection.PropertyInfo[] properties = typeof(T).GetProperties();
+
+        foreach(var prop in properties)
+        {
+            //Получение атрибута JsonProperty
+            Newtonsoft.Json.JsonPropertyAttribute[] jsonPropertyAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+            if (jsonPropertyAttrs.Length <= 0)
+            {
+                throw new InsertException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
+            }
+            Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
+
+            //Получение атрибута RdevTypeAttribute
+            RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
+            if (rdevTypeAttributes.Length <= 0)
+            {
+                throw new InsertException($"Не удалось получить атрибуты RdevTypeAttribute у свойства '{prop.Name}'");
+            }
+            RdevTypeAttribute rdevTypeAttribute = rdevTypeAttributes[0];
+
+            //Наполнение системных полей
+            switch (jsonPropertyAttr.PropertyName)
+            {
+                case "recid":
+                    object propRecIdValue = prop.GetValue(insertObject, null);
+                    if (propRecIdValue == null)
+                    {
+                        prop.SetValue(insertObject, System.Guid.NewGuid());
+                    }
+                    break;
+                case "reccreatedby":
+                    prop.SetValue(insertObject, userInfo.Value<string>("recid"));
+                    break;
+                case "reccreated":
+                    prop.SetValue(insertObject, System.DateTime.UtcNow);
+                    break;
+                case "recupdated":
+                    prop.SetValue(insertObject, System.DateTime.UtcNow);
+                    break;
+                case "recstate":
+                    prop.SetValue(insertObject, 1);
+                    break;
+            }
+
+
+            switch (rdevTypeAttribute.GetType())
+            {
+                case RdevTypes.SysString:
+                    object propValueSysString = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if(propValueSysString == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysString}'");
+                    }
+
+                    break;
+                case RdevTypes.SysInt:
+                    object propValueSysInt = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysInt == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysInt}'");
+                    }
+                    break;
+                case RdevTypes.SysRelation:
+                    System.Reflection.PropertyInfo[] relatedFieldProps = prop.PropertyType.GetProperties();
+                    foreach (var relatedFieldProp in relatedFieldProps)
+                    {
+                        object relatedFieldValue = prop.GetValue(insertObject, null);
+                        if (relatedFieldValue != null)
+                        {
+                            //Получение атрибута JsonProperty
+                            Newtonsoft.Json.JsonPropertyAttribute[] relatedFieldPropJsonPropertyAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(relatedFieldProp, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+                            if (jsonPropertyAttrs.Length <= 0)
+                            {
+                                throw new InsertException($"Не удалось получить атрибуты JsonProperty у свойства '{relatedFieldProp.Name}'");
+                            }
+                            Newtonsoft.Json.JsonPropertyAttribute relatedFieldPropJsonPropertyAttr = relatedFieldPropJsonPropertyAttrs[0];
+
+                            if (relatedFieldPropJsonPropertyAttr.PropertyName == "recid")
+                            {
+                                keys.Add(jsonPropertyAttr.PropertyName);
+
+                                object propValueSysRelation = relatedFieldProp.GetValue(relatedFieldValue, null);
+                                if (propValueSysRelation != null)
+                                {
+                                    values.Add($"'{propValueSysRelation}'");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case RdevTypes.SysDate:
+                    object propValueSysDate = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysDate == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysDate}'");
+                    }
+                    break;
+                case RdevTypes.SysTimeDate:
+                    object propValueSysTimeDate = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysTimeDate == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysTimeDate}'");
+                    }
+                    break;
+                case RdevTypes.SysFile:
+                    break;
+                case RdevTypes.SysBoolean:
+                    object propValueSysBoolean = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysBoolean == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysBoolean}'");
+                    }
+                    break;
+                case RdevTypes.SysGUID:
+                    object propValueSysGUID = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysGUID == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysGUID}'");
+                    }
+                    break;
+                case RdevTypes.SysENUM:
+                    break;
+                case RdevTypes.SysNumber:
+                    object propValueSysNumber = prop.GetValue(insertObject, null);
+
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysNumber == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysNumber}'");
+                    }
+                    break;
+                case RdevTypes.SysDecimal:
+                    object propValueSysDecimal = prop.GetValue(insertObject, null);
+                    keys.Add(jsonPropertyAttr.PropertyName);
+                    if (propValueSysDecimal == null)
+                    {
+                        values.Add("NULL");
+                    }
+                    else
+                    {
+                        values.Add($"'{propValueSysDecimal}'");
+                    }
+                    break;
+            }
+        }
+
+        InsertQueryParams<T> res = new InsertQueryParams<T>(keys, values, queryParams, insertObject);
+        return res;
+    }
+
+    /// <summary>
+    /// Подготовка параметров для Update запроса
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="updateObject"></param>
+    /// <returns></returns>
+    private UpdateQueryParams<T> PrepareUpdateQueryParams<T>(T updateObject)
+    {
+        System.Collections.Generic.List<string> queryParams = new System.Collections.Generic.List<string>();
+        System.Collections.Generic.List<System.Data.SqlClient.SqlParameter> updateParams = new System.Collections.Generic.List<System.Data.SqlClient.SqlParameter>();
+        System.Guid updateRecordRecid = System.Guid.Empty;
+
+        //Получение свойств объекта
+        System.Reflection.PropertyInfo[] properties = typeof(T).GetProperties();
+
+        foreach (var prop in properties)
+        {
+            //Получение атрибута JsonProperty
+            Newtonsoft.Json.JsonPropertyAttribute[] jsonPropertyAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+            if (jsonPropertyAttrs.Length <= 0)
+            {
+                throw new UpdateException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
+            }
+            Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
+
+            //Получение атрибута RdevTypeAttribute
+            RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
+            if (rdevTypeAttributes.Length <= 0)
+            {
+                throw new UpdateException($"Не удалось получить атрибуты RdevTypeAttribute у свойства '{prop.Name}'");
+            }
+            RdevTypeAttribute rdevTypeAttribute = rdevTypeAttributes[0];
+
+            //Получение и обновление системных полей
+            switch (jsonPropertyAttr.PropertyName)
+            {
+                case "recid":
+                    object propRecIdValue = prop.GetValue(updateObject, null);
+                    if (propRecIdValue == null)
+                    {
+                        throw new UpdateException("В обновляемом объекте не заполнено свойство RecId");
+                    }
+                    else
+                    {
+                        updateRecordRecid = (System.Guid)propRecIdValue;
+                    }
+                    break;
+                case "recupdatedby":
+                    prop.SetValue(updateObject, userInfo.Value<string>("recid"));
+                    break;
+                case "recupdated":
+                    prop.SetValue(updateObject, System.DateTime.UtcNow);
+                    break;
+            }
+
+
+            switch (rdevTypeAttribute.GetType())
+            {
+                case RdevTypes.SysString:
+                    object propValueSysString = prop.GetValue(updateObject, null);
+
+                    if (propValueSysString == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysString}'");
+                    }
+
+                    break;
+                case RdevTypes.SysInt:
+                    object propValueSysInt = prop.GetValue(updateObject, null);
+
+                    if (propValueSysInt == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysInt}'");
+                    }
+                    break;
+                case RdevTypes.SysRelation:
+                    System.Reflection.PropertyInfo[] relatedFieldProps = prop.PropertyType.GetProperties();
+                    foreach (var relatedFieldProp in relatedFieldProps)
+                    {
+                        object relatedFieldValue = prop.GetValue(updateObject, null);
+                        if (relatedFieldValue != null)
+                        {
+                            //Получение атрибута JsonProperty
+                            Newtonsoft.Json.JsonPropertyAttribute[] relatedFieldPropJsonPropertyAttrs = (Newtonsoft.Json.JsonPropertyAttribute[])System.Attribute.GetCustomAttributes(relatedFieldProp, typeof(Newtonsoft.Json.JsonPropertyAttribute), false);
+                            if (jsonPropertyAttrs.Length <= 0)
+                            {
+                                throw new UpdateException($"Не удалось получить атрибуты JsonProperty у свойства '{relatedFieldProp.Name}'");
+                            }
+                            Newtonsoft.Json.JsonPropertyAttribute relatedFieldPropJsonPropertyAttr = relatedFieldPropJsonPropertyAttrs[0];
+
+                            if (relatedFieldPropJsonPropertyAttr.PropertyName == "recid")
+                            {
+
+                                object propValueSysRelation = relatedFieldProp.GetValue(relatedFieldValue, null);
+                                if (propValueSysRelation != null)
+                                {
+                                    queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysRelation}'");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case RdevTypes.SysDate:
+                    object propValueSysDate = prop.GetValue(updateObject, null);
+
+                    if (propValueSysDate == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysDate}'");
+                    }
+                    break;
+                case RdevTypes.SysTimeDate:
+                    object propValueSysTimeDate = prop.GetValue(updateObject, null);
+
+                    if (propValueSysTimeDate == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysTimeDate}'");
+                    }
+                    break;
+                case RdevTypes.SysFile:
+                    break;
+                case RdevTypes.SysBoolean:
+                    object propValueSysBoolean = prop.GetValue(updateObject, null);
+
+                    if (propValueSysBoolean == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysBoolean}'");
+                    }
+                    break;
+                case RdevTypes.SysGUID:
+                    object propValueSysGUID = prop.GetValue(updateObject, null);
+
+                    if (propValueSysGUID == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysGUID}'");
+                    }
+                    break;
+                case RdevTypes.SysENUM:
+                    break;
+                case RdevTypes.SysNumber:
+                    object propValueSysNumber = prop.GetValue(updateObject, null);
+
+                    if (propValueSysNumber == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysNumber}'");
+                    }
+                    break;
+                case RdevTypes.SysDecimal:
+                    object propValueSysDecimal = prop.GetValue(updateObject, null);
+
+                    if (propValueSysDecimal == null)
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                    }
+                    else
+                    {
+                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysDecimal}'");
+                    }
+                    break;
+            }
+        }
+        UpdateQueryParams<T> res = new UpdateQueryParams<T>(updateRecordRecid, queryParams, updateParams, updateObject);
+        return res;
+    }
+
+    /// <summary>
+    /// Найти запись по Recid
+    /// </summary>
+    /// <typeparam name="T">Тип объекта таблицы</typeparam>
+    /// <param name="recid">Идентификатор записи в таблице</param>
     /// <returns></returns>
     private static T FindByRecidStatic<T>(System.Guid recid, Npgsql.NpgsqlConnection connection) where T : new()
     {
@@ -106,7 +831,7 @@ public class RdevDatabaseContext
         {
             throw new FindByRecidException("У таблицы не найден атрибут RdevTableInfo");
         }
-
+        var recordsList = new Newtonsoft.Json.Linq.JArray();
         //Выполнение запроса в БД
         using (var command = new Npgsql.NpgsqlCommand($"SELECT * FROM {tableInfo.GetTableName()} WHERE recid = '{recid.ToString()}' AND recstate = 1"))
         {
@@ -114,23 +839,32 @@ public class RdevDatabaseContext
 
             using (var reader = command.ExecuteReader())
             {
-                var recordList = new Newtonsoft.Json.Linq.JArray();
-
                 while (reader.Read())
                 {
                     var record = GetDataFromReader(reader);
 
-                    recordList.Add(record);
+                    recordsList.Add(record);
                 }
-                if (recordList.Count < 1)
+                if (recordsList.Count > 1)
                 {
-                    throw new FindByRecidException("Запрос в БД по идентификатору в таблицу ХЪ");
+                    throw new FindByRecidException($"Запрос в БД по идентификатору в таблицу '{tableInfo.GetTableName()}' вернул больше одной записи.");
                 }
-
-                T databaseObject = FillDatabaseObjectProperties<T>(recordList.First, connection);
-
-                return databaseObject;
+                if(recordsList.Count <= 0)
+                {
+                    return default(T);
+                }
             }
+        }
+
+        try
+        {
+            T databaseObject = FillDatabaseObjectProperties<T>(recordsList.First, connection);
+
+            return databaseObject;
+        }
+        catch(FillDatabaseObjectPropertiesException e)
+        {
+            throw new FindByRecidException(e.Message);
         }
     }
 
@@ -178,7 +912,9 @@ public class RdevDatabaseContext
     private static T FillDatabaseObjectProperties<T>(Newtonsoft.Json.Linq.JToken resultFromDb, Npgsql.NpgsqlConnection connection) where T : new()
     {
         T resultObject = new T();
-        System.Reflection.PropertyInfo[] properties = resultObject.GetType().GetProperties();
+        System.Type databaseObjectType = typeof(T);
+
+        System.Reflection.PropertyInfo[] properties = databaseObjectType.GetProperties();
 
         foreach (System.Reflection.PropertyInfo prop in properties)
         {
@@ -224,8 +960,7 @@ public class RdevDatabaseContext
                         throw new FillDatabaseObjectPropertiesException($"Не удалось распарсить строку в тип Guid?: {e.Message}");
                     }
 
-
-                    var propType = prop.GetType();
+                    var propType = prop.PropertyType;
 
                     System.Reflection.MethodInfo methodInfo = typeof(RdevDatabaseContext).GetMethod("FindByRecidStatic", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
                     System.Reflection.MethodInfo genericMethodInfo = methodInfo.MakeGenericMethod(propType);
@@ -294,6 +1029,14 @@ public class RdevDatabaseContext
     }
 
     /// <summary>
+    /// Исключение, возникающее в методе FindByParams
+    /// </summary>
+    public class FindByParamsException : System.Exception
+    {
+        public FindByParamsException(string message): base($"Не удалось получить записи по параметрам: {message}") { }
+    }
+
+    /// <summary>
     /// Исключение, возвращаемое методом FillDatabaseObjectProperties
     /// </summary>
     public class FillDatabaseObjectPropertiesException: System.Exception
@@ -301,4 +1044,27 @@ public class RdevDatabaseContext
         public FillDatabaseObjectPropertiesException (string message) : base($"Не удалось получить атрибуты свойства таблицы: {message}") { }
     }
 
+    /// <summary>
+    /// Исключение, возвращаемое методом INSERT
+    /// </summary>
+    public class InsertException : System.Exception
+    {
+        public InsertException(string message) : base($"Не удалось запись в таблице: {message}") { }
+    }
+
+    /// <summary>
+    /// Исключение, возвращаемое методом UPDATE
+    /// </summary>
+    public class UpdateException : System.Exception
+    {
+        public UpdateException(string message) : base($"Не удалось обновить запись в таблице: {message}") { }
+    }
+
+    /// <summary>
+    /// Исключение, возвращаемое методом DELETE
+    /// </summary>
+    public class DeleteException : System.Exception
+    {
+        public DeleteException(string message): base ($"Не удалось удалить запись из БД: {message}") { }
+    }
 }

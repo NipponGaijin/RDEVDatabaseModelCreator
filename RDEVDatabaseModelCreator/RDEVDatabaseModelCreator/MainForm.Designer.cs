@@ -75,7 +75,6 @@
             // 
             // infoTxt
             // 
-            this.infoTxt.Enabled = false;
             this.infoTxt.Location = new System.Drawing.Point(12, 322);
             this.infoTxt.Multiline = true;
             this.infoTxt.Name = "infoTxt";
@@ -85,7 +84,6 @@
             // 
             // openedFolderTxt
             // 
-            this.openedFolderTxt.Enabled = false;
             this.openedFolderTxt.Location = new System.Drawing.Point(12, 27);
             this.openedFolderTxt.Multiline = true;
             this.openedFolderTxt.Name = "openedFolderTxt";

@@ -7,6 +7,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -22,6 +23,7 @@ namespace RDEVDatabaseModelCreator
         JObject _sysProjectFile;
         string _outputFolderPath;
         string _openedFolder = "";
+        List<RdevTable> _rdevTables = new List<RdevTable>();
 
         string[] exceptionTableNames = {
             "RDEV___Auth_Data_Policies"
@@ -184,6 +186,8 @@ namespace RDEVDatabaseModelCreator
         /// </summary>
         private void BuildObjectModel()
         {
+            _rdevTables = new List<RdevTable>();
+
             _projectFile.Merge(_sysProjectFile);
             //Получение таблиц и типов из проектного файла
             JToken tables = _projectFile["tables"];
@@ -221,12 +225,18 @@ namespace RDEVDatabaseModelCreator
             {
                 GenerateLogString($"Таблицы успешно обработаны");
             }
+            else
+            {
+                GenerateLogString($"Таблицы не обработаны!");
+                MessageBox.Show($"Таблицы не обработаны!");
+                return;
+            }
 
             ModelBuilder modelBuilder = new ModelBuilder(rdevTables, this);
             CodeCompileUnit model = modelBuilder.Build(namespaceTxt.Text);
 
             string generatedCOde = GenerateCSharpCode(model);
-
+            Process.Start(_openedFolder);
         }
 
         /// <summary>
@@ -313,19 +323,21 @@ namespace RDEVDatabaseModelCreator
         /// <returns></returns>
         private List<RdevTable> ProcessRdevTable(JToken table, JToken tables, JToken types)
         {
+            GenerateLogString($"Обработка полей таблицы '{table["name"]}' ('{table["displayName"]}')!");
             List<RdevTable> rdevTables = new List<RdevTable>();
-
-            JToken fields = table["fields"];
-            if (fields == null)
-            {
-                GenerateLogString($"Описание полей не найдено в таблице '{table["displayName"]}'!");
-                return null;
-            }
 
 
             RdevTable rdevTable = new RdevTable();
             rdevTable.Name = table.Value<string>("name");
             rdevTable.DisplayName = table.Value<string>("displayName");
+
+            JToken fields = table["fields"];
+            if (fields == null)
+            {
+                GenerateLogString($"Описание полей не найдено в таблице '{table["name"]}' ('{table["displayName"]}')!");
+                rdevTables.Add(rdevTable);
+                return rdevTables;
+            }
 
             foreach (JToken field in fields)
             {
@@ -349,7 +361,7 @@ namespace RDEVDatabaseModelCreator
 
                     if (rdevField.Type == null)
                     {
-                        GenerateLogString($"Не удалось определить тип поля '{field["name"]}', таблицы '{table["name"]}'");
+                        GenerateLogString($"Не удалось определить тип ('{type.Value<string>("type")}') поля '{field["name"]}', таблицы '{table["name"]}'");
                         return null;
                     }
 
@@ -379,7 +391,7 @@ namespace RDEVDatabaseModelCreator
 
                     if (rdevField.Type == null)
                     {
-                        GenerateLogString($"Не удалось определить тип поля '{field["name"]}', таблицы '{table["name"]}'");
+                        GenerateLogString($"Не удалось определить тип ('{type.Value<string>("type")}') поля '{field["name"]}', таблицы '{table["name"]}'");
                         return null;
                     }
 
@@ -415,14 +427,20 @@ namespace RDEVDatabaseModelCreator
                             continue;
                         }
 
+                        if (_rdevTables.Find(x => x.Name == relatedTable.Value<string>("name")) != null)
+                        {
+                            continue;
+                        }
+
                         var relatedTables = ProcessRdevTable(relatedTable, tables, types);
                         if (relatedTables != null)
                         {
                             foreach (var tab in relatedTables)
                             {
-                                if (rdevTables.Find(x => (x.Name ?? "").ToLower() == (tab.Name ?? "").ToLower()) == null)
+                                if (_rdevTables.Find(x => (x.Name ?? "").ToLower() == (tab.Name ?? "").ToLower()) == null)
                                 {
                                     rdevTables.Add(tab);
+                                    _rdevTables.Add(rdevTable);
                                 }
                                 if (tab.Name.ToLower() == relation.Value<string>("table").ToLower())
                                 {
@@ -432,6 +450,7 @@ namespace RDEVDatabaseModelCreator
                         }
                         else
                         {
+                            GenerateLogString($"Не удалось разобрать связанную таблицу для типа '{type["name"]}' поля '{field["name"]}', таблицы '{table["name"]}'");
                             return null;
                         }
 
@@ -455,7 +474,7 @@ namespace RDEVDatabaseModelCreator
             }
 
             rdevTables.Add(rdevTable);
-
+            _rdevTables.Add(rdevTable);
             return rdevTables;
         }
     }

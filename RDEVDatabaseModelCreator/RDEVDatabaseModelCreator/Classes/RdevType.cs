@@ -29,6 +29,8 @@ namespace RDEVDatabaseModelCreator
                     return RdevTypes.SysENUM;
                 case "SysNumber":
                     return RdevTypes.SysNumber;
+                case "SysDecimal":
+                    return RdevTypes.SysDecimal;
                 default:
                     return null;
             }
