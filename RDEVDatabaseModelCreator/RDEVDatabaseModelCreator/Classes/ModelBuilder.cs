@@ -222,6 +222,11 @@ namespace RDEVDatabaseModelCreator.Classes
                         generatedField = new CodeSnippetTypeMember();
                         generatedField.Text = $"\t\t\tpublic int? {fieldName} {{ get; set; }}";
                         break;
+                    case RdevTypes.SysDecimal:
+                        customAttributes.Add($"RdevTypeAttribute({RdevTypesInfo.rdevTypesInfo[RdevTypes.SysDecimal]})");
+                        generatedField = new CodeSnippetTypeMember();
+                        generatedField.Text = $"\t\t\tpublic float? {fieldName} {{ get; set; }}";
+                        break;
                 }
                 //Генерация атрибута
                 uiForm.GenerateLogString($"Генерация атрибута [JsonProperty(\"{field.Name}\")] для поля '{field.Name}', имя в таблице '{fieldName}'");

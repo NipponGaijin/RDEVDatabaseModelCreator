@@ -1015,6 +1015,11 @@ public class RdevDatabaseContext
                     int? propValueSysNumber = resultFromDb.Value<int?>(jsonPropertyAttr.PropertyName);
                     prop.SetValue(resultObject, propValueSysNumber);
                     break;
+                case RdevTypes.SysDecimal:
+                    float? propValueSysDecimal = resultFromDb.Value<float?>(jsonPropertyAttr.PropertyName);
+                    prop.SetValue(resultObject, propValueSysDecimal);
+                    break;
+
             }
         }
         return resultObject;
