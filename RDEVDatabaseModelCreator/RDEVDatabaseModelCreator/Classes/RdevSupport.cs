@@ -444,6 +444,7 @@ public class RdevDatabaseContext
                 throw new InsertException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
             }
             Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
+            string fieldName = jsonPropertyAttr.PropertyName;
 
             //Получение атрибута RdevTypeAttribute
             RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
@@ -454,7 +455,7 @@ public class RdevDatabaseContext
             RdevTypeAttribute rdevTypeAttribute = rdevTypeAttributes[0];
 
             //Наполнение системных полей
-            switch (jsonPropertyAttr.PropertyName)
+            switch (fieldName)
             {
                 case "recid":
                     object propRecIdValue = prop.GetValue(insertObject, null);
@@ -477,13 +478,17 @@ public class RdevDatabaseContext
                     break;
             }
 
+            if (fieldName.Length >= 64)
+            {
+                fieldName = $"\"{fieldName.Substring(0, 62)}~\"";
+            }
 
             switch (rdevTypeAttribute.GetType())
             {
                 case RdevTypes.SysString:
                     object propValueSysString = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if(propValueSysString == null)
                     {
                         values.Add("NULL");
@@ -497,7 +502,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysInt:
                     object propValueSysInt = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysInt == null)
                     {
                         values.Add("NULL");
@@ -524,7 +529,7 @@ public class RdevDatabaseContext
 
                             if (relatedFieldPropJsonPropertyAttr.PropertyName == "recid")
                             {
-                                keys.Add(jsonPropertyAttr.PropertyName);
+                                keys.Add(fieldName);
 
                                 object propValueSysRelation = relatedFieldProp.GetValue(relatedFieldValue, null);
                                 if (propValueSysRelation != null)
@@ -539,7 +544,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysDate:
                     object propValueSysDate = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysDate == null)
                     {
                         values.Add("NULL");
@@ -552,7 +557,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysTimeDate:
                     object propValueSysTimeDate = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysTimeDate == null)
                     {
                         values.Add("NULL");
@@ -567,7 +572,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysBoolean:
                     object propValueSysBoolean = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysBoolean == null)
                     {
                         values.Add("NULL");
@@ -580,7 +585,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysGUID:
                     object propValueSysGUID = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysGUID == null)
                     {
                         values.Add("NULL");
@@ -595,7 +600,7 @@ public class RdevDatabaseContext
                 case RdevTypes.SysNumber:
                     object propValueSysNumber = prop.GetValue(insertObject, null);
 
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysNumber == null)
                     {
                         values.Add("NULL");
@@ -607,7 +612,7 @@ public class RdevDatabaseContext
                     break;
                 case RdevTypes.SysDecimal:
                     object propValueSysDecimal = prop.GetValue(insertObject, null);
-                    keys.Add(jsonPropertyAttr.PropertyName);
+                    keys.Add(fieldName);
                     if (propValueSysDecimal == null)
                     {
                         values.Add("NULL");
@@ -648,6 +653,7 @@ public class RdevDatabaseContext
                 throw new UpdateException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
             }
             Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
+            string fieldName = jsonPropertyAttr.PropertyName;
 
             //Получение атрибута RdevTypeAttribute
             RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
@@ -658,7 +664,7 @@ public class RdevDatabaseContext
             RdevTypeAttribute rdevTypeAttribute = rdevTypeAttributes[0];
 
             //Получение и обновление системных полей
-            switch (jsonPropertyAttr.PropertyName)
+            switch (fieldName)
             {
                 case "recid":
                     object propRecIdValue = prop.GetValue(updateObject, null);
@@ -679,6 +685,12 @@ public class RdevDatabaseContext
                     break;
             }
 
+            //Если длина имени поля больше 64х символов, она укорачивается и добавляется тильда в конце
+            if (fieldName.Length >= 64)
+            {
+                fieldName = $"\"{fieldName.Substring(0, 62)}~\"";
+            }
+
 
             switch (rdevTypeAttribute.GetType())
             {
@@ -687,11 +699,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysString == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysString}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysString}'");
                     }
 
                     break;
@@ -700,11 +712,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysInt == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysInt}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysInt}'");
                     }
                     break;
                 case RdevTypes.SysRelation:
@@ -740,11 +752,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysDate == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysDate}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysDate}'");
                     }
                     break;
                 case RdevTypes.SysTimeDate:
@@ -752,11 +764,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysTimeDate == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysTimeDate}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysTimeDate}'");
                     }
                     break;
                 case RdevTypes.SysFile:
@@ -766,11 +778,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysBoolean == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysBoolean}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysBoolean}'");
                     }
                     break;
                 case RdevTypes.SysGUID:
@@ -778,11 +790,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysGUID == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysGUID}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysGUID}'");
                     }
                     break;
                 case RdevTypes.SysENUM:
@@ -792,11 +804,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysNumber == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysNumber}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysNumber}'");
                     }
                     break;
                 case RdevTypes.SysDecimal:
@@ -804,11 +816,11 @@ public class RdevDatabaseContext
 
                     if (propValueSysDecimal == null)
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = NULL");
+                        queryParams.Add($"{fieldName} = NULL");
                     }
                     else
                     {
-                        queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysDecimal}'");
+                        queryParams.Add($"{fieldName} = '{propValueSysDecimal}'");
                     }
                     break;
             }
