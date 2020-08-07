@@ -75,11 +75,11 @@
             // 
             // infoTxt
             // 
-            this.infoTxt.Location = new System.Drawing.Point(12, 322);
+            this.infoTxt.Location = new System.Drawing.Point(12, 140);
             this.infoTxt.Multiline = true;
             this.infoTxt.Name = "infoTxt";
             this.infoTxt.ReadOnly = true;
-            this.infoTxt.Size = new System.Drawing.Size(776, 116);
+            this.infoTxt.Size = new System.Drawing.Size(776, 298);
             this.infoTxt.TabIndex = 1;
             // 
             // openedFolderTxt
@@ -95,7 +95,7 @@
             // 
             this.buildObjectModelBtn.Location = new System.Drawing.Point(12, 94);
             this.buildObjectModelBtn.Name = "buildObjectModelBtn";
-            this.buildObjectModelBtn.Size = new System.Drawing.Size(776, 222);
+            this.buildObjectModelBtn.Size = new System.Drawing.Size(776, 40);
             this.buildObjectModelBtn.TabIndex = 3;
             this.buildObjectModelBtn.TabStop = false;
             this.buildObjectModelBtn.Text = "Сформировать объектную модель";
@@ -131,6 +131,8 @@
             this.Controls.Add(this.infoTxt);
             this.Controls.Add(this.menuStrip1);
             this.MainMenuStrip = this.menuStrip1;
+            this.MaximumSize = new System.Drawing.Size(816, 489);
+            this.MinimumSize = new System.Drawing.Size(816, 489);
             this.Name = "MainForm";
             this.Text = "RDEVDatabaseModelCreator";
             this.Load += new System.EventHandler(this.MainForm_Load);

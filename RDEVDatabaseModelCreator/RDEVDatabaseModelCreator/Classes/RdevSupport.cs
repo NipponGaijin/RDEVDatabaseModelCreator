@@ -135,16 +135,9 @@ public enum OrderByType
 /// </summary>
 public class RdevDatabaseContext
 {
-    private Newtonsoft.Json.Linq.JToken userInfo = null;
-
     public Npgsql.NpgsqlConnection Connection { get; } = null;
     public Npgsql.NpgsqlTransaction Transaction { get; } = null;
-    public Newtonsoft.Json.Linq.JToken UserInfo { 
-        get
-        {
-            return this.userInfo;
-        } 
-    }
+    public Newtonsoft.Json.Linq.JToken UserInfo { get; } = null;
     /// <summary>
     /// Класс для работы с БД рдева
     /// </summary>
@@ -155,7 +148,7 @@ public class RdevDatabaseContext
     {
         this.Connection = connection;
         this.Transaction = transaction;
-        this.userInfo = userInfo;
+        this.UserInfo = userInfo;
     }
 
     /// <summary>
@@ -471,7 +464,7 @@ public class RdevDatabaseContext
                     }
                     break;
                 case "reccreatedby":
-                    prop.SetValue(insertObject, userInfo.Value<string>("recid"));
+                    prop.SetValue(insertObject, UserInfo.Value<string>("recid"));
                     break;
                 case "reccreated":
                     prop.SetValue(insertObject, System.DateTime.UtcNow);
@@ -684,7 +677,7 @@ public class RdevDatabaseContext
                     }
                     break;
                 case "recupdatedby":
-                    prop.SetValue(updateObject, userInfo.Value<string>("recid"));
+                    prop.SetValue(updateObject, UserInfo.Value<string>("recid"));
                     break;
                 case "recupdated":
                     prop.SetValue(updateObject, System.DateTime.UtcNow);

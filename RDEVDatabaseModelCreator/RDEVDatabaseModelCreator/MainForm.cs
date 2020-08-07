@@ -36,7 +36,7 @@ namespace RDEVDatabaseModelCreator
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-
+            infoTxt.ScrollBars = ScrollBars.Vertical;
         }
 
 
@@ -236,7 +236,7 @@ namespace RDEVDatabaseModelCreator
             CodeCompileUnit model = modelBuilder.Build(namespaceTxt.Text);
 
             string generatedCOde = GenerateCSharpCode(model);
-            Process.Start(_openedFolder);
+            Process.Start(_outputFolderPath);
         }
 
         /// <summary>
@@ -261,7 +261,7 @@ namespace RDEVDatabaseModelCreator
                 sourceFile = "DatabaseModel." + provider.FileExtension;
             }
 
-            sourceFile = Path.Combine(_openedFolder, sourceFile);
+            sourceFile = Path.Combine(_outputFolderPath, sourceFile);
 
             // Create a TextWriter to a StreamWriter to the output file.
             using (StreamWriter sw = new StreamWriter(sourceFile, false))
