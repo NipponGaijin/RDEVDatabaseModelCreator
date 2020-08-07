@@ -135,10 +135,16 @@ public enum OrderByType
 /// </summary>
 public class RdevDatabaseContext
 {
-    private Npgsql.NpgsqlConnection connection = null;
-    private Npgsql.NpgsqlTransaction transaction = null;
     private Newtonsoft.Json.Linq.JToken userInfo = null;
 
+    public Npgsql.NpgsqlConnection Connection { get; } = null;
+    public Npgsql.NpgsqlTransaction Transaction { get; } = null;
+    public Newtonsoft.Json.Linq.JToken UserInfo { 
+        get
+        {
+            return this.userInfo;
+        } 
+    }
     /// <summary>
     /// Класс для работы с БД рдева
     /// </summary>
@@ -147,8 +153,8 @@ public class RdevDatabaseContext
     /// <param name="userInfo"></param>
     public RdevDatabaseContext(Npgsql.NpgsqlConnection connection, Npgsql.NpgsqlTransaction transaction, Newtonsoft.Json.Linq.JToken userInfo)
     {
-        this.connection = connection;
-        this.transaction = transaction;
+        this.Connection = connection;
+        this.Transaction = transaction;
         this.userInfo = userInfo;
     }
 
@@ -160,7 +166,7 @@ public class RdevDatabaseContext
     /// <returns></returns>
     public T FindByRecid<T>(System.Guid recid) where T : new()
     {
-        return FindByRecidStatic<T>(recid, connection);
+        return FindByRecidStatic<T>(recid, Connection);
     }
 
     /// <summary>
@@ -177,7 +183,7 @@ public class RdevDatabaseContext
         System.Collections.Generic.List<T> result = new System.Collections.Generic.List<T>();
         using (var command = new Npgsql.NpgsqlCommand($"SELECT * FROM {tableInfo.GetTableName()} WHERE {whereStatement} AND recstate = 1"))
         {
-            command.Connection = this.connection;
+            command.Connection = this.Connection;
             using (var reader = command.ExecuteReader())
             {
                 while (reader.Read())
@@ -198,7 +204,7 @@ public class RdevDatabaseContext
         {
             try
             {
-                T databaseObject = FillDatabaseObjectProperties<T>(record, connection);
+                T databaseObject = FillDatabaseObjectProperties<T>(record, Connection);
                 result.Add(databaseObject);
             } 
             catch (FillDatabaseObjectPropertiesException e)
@@ -227,7 +233,7 @@ public class RdevDatabaseContext
         System.Collections.Generic.List<T> result = new System.Collections.Generic.List<T>();
         using (var command = new Npgsql.NpgsqlCommand($"SELECT * FROM {tableInfo.GetTableName()} WHERE {whereStatement} AND recstate = 1 ORDER BY {orderByStatement}"))
         {
-            command.Connection = this.connection;
+            command.Connection = this.Connection;
             using (var reader = command.ExecuteReader())
             {
                 while (reader.Read())
@@ -248,7 +254,7 @@ public class RdevDatabaseContext
         {
             try
             {
-                T databaseObject = FillDatabaseObjectProperties<T>(record, connection);
+                T databaseObject = FillDatabaseObjectProperties<T>(record, Connection);
                 result.Add(databaseObject);
             }
             catch (FillDatabaseObjectPropertiesException e)
@@ -286,8 +292,8 @@ public class RdevDatabaseContext
                         command.Parameters.AddWithValue(parameter.ParameterName, parameter.Value);
                     }
                 }
-                command.Connection = this.connection;
-                command.Transaction = this.transaction;
+                command.Connection = this.Connection;
+                command.Transaction = this.Transaction;
                 int rowsCount = command.ExecuteNonQuery();
                 return insertQueryParams.InsertObject;
             }
@@ -354,8 +360,8 @@ public class RdevDatabaseContext
         {
             using (var command = new Npgsql.NpgsqlCommand($"UPDATE {tableInfo.GetTableName()} SET {updateQueryParams.QueryParams} WHERE recid = '{recordId.ToString()}'"))
             {
-                command.Connection = this.connection;
-                command.Transaction = this.transaction;
+                command.Connection = this.Connection;
+                command.Transaction = this.Transaction;
                 int rowsCount = command.ExecuteNonQuery();
                 return updateQueryParams.UpdateObject;
             }
@@ -400,8 +406,8 @@ public class RdevDatabaseContext
                     {
                         using (var command = new Npgsql.NpgsqlCommand($"DELETE FROM {tableInfo.GetTableName()} WHERE recid = '{propValue}'"))
                         {
-                            command.Connection = this.connection;
-                            command.Transaction = this.transaction;
+                            command.Connection = this.Connection;
+                            command.Transaction = this.Transaction;
                             int rowsCount = command.ExecuteNonQuery();
                             return rowsCount;
                         }
