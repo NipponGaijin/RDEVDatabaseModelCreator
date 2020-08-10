@@ -429,6 +429,8 @@ namespace RDEVDatabaseModelCreator
 
                         if (_rdevTables.Find(x => x.Name == relatedTable.Value<string>("name")) != null)
                         {
+                            rdevField.RelatedTable = _rdevTables.Find(x => x.Name == relatedTable.Value<string>("name"));
+                            rdevTable.AddField(rdevField);
                             continue;
                         }
 
