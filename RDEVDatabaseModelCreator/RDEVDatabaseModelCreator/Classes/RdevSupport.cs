@@ -144,7 +144,7 @@ public class RdevDatabaseContext
     /// <param name="connection"></param>
     /// <param name="transaction"></param>
     /// <param name="userInfo"></param>
-    public RdevDatabaseContext(Npgsql.NpgsqlConnection connection, Npgsql.NpgsqlTransaction transaction, Newtonsoft.Json.Linq.JToken userInfo)
+    public RdevDatabaseContext(Npgsql.NpgsqlConnection connection, Npgsql.NpgsqlTransaction transaction, Newtonsoft.Json.Linq.JToken userInfo = null)
     {
         this.Connection = connection;
         this.Transaction = transaction;
@@ -464,7 +464,10 @@ public class RdevDatabaseContext
                     }
                     break;
                 case "reccreatedby":
-                    prop.SetValue(insertObject, UserInfo.Value<string>("recid"));
+                    if(UserInfo != null)
+                    {
+                        prop.SetValue(insertObject, UserInfo.Value<string>("recid"));
+                    }
                     break;
                 case "reccreated":
                     prop.SetValue(insertObject, System.DateTime.UtcNow);
@@ -677,7 +680,10 @@ public class RdevDatabaseContext
                     }
                     break;
                 case "recupdatedby":
-                    prop.SetValue(updateObject, UserInfo.Value<string>("recid"));
+                    if (UserInfo != null)
+                    {
+                        prop.SetValue(updateObject, UserInfo.Value<string>("recid"));
+                    }
                     break;
                 case "recupdated":
                     prop.SetValue(updateObject, System.DateTime.UtcNow);
