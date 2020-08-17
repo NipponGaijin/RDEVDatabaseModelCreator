@@ -323,7 +323,7 @@ namespace RDEVDatabaseModelCreator
         /// <returns></returns>
         private List<RdevTable> ProcessRdevTable(JToken table, JToken tables, JToken types)
         {
-            GenerateLogString($"Обработка полей таблицы '{table["name"]}' ('{table["displayName"]}')!");
+            GenerateLogString($"Обработка полей таблицы '{table["name"]}' ('{table["displayName"]}')");
             List<RdevTable> rdevTables = new List<RdevTable>();
 
 
