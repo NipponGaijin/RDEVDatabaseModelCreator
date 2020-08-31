@@ -45,7 +45,7 @@ public static class RdevTypesInfo
 }
 
 /// <summary>
-/// Арибут системного типа рдева
+/// Атрибут системного типа рдева
 /// </summary>
 public class RdevTypeAttribute : System.Attribute
 {
