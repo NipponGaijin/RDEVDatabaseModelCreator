@@ -470,6 +470,9 @@ public class RdevDatabaseContext
                         prop.SetValue(insertObject, UserInfo.Value<string>("recid"));
                     }
                     break;
+                case "recupdatedby":
+                    prop.SetValue(insertObject, UserInfo.Value<string>("recid"));
+                    break;
                 case "reccreated":
                     prop.SetValue(insertObject, System.DateTime.UtcNow);
                     break;
