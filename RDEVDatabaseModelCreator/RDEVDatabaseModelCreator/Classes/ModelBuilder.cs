@@ -31,7 +31,7 @@ namespace RDEVDatabaseModelCreator.Classes
             modelClass.IsClass = true;
             modelClass.TypeAttributes = TypeAttributes.Public;
             modelClass.Comments.Add(new CodeCommentStatement("https://github.com/NipponGaijin/RDEVDatabaseModelCreator", true));
-            modelClass.Comments.Add(new CodeCommentStatement($"BuildDate {DateTime.UtcNow.ToString("dd.MM.yyyy")}", true));
+            modelClass.Comments.Add(new CodeCommentStatement($"BuildDate {DateTime.UtcNow.ToString("hh:mm:ss dd.MM.yyyy")}", true));
             uiForm = form;
 
         }

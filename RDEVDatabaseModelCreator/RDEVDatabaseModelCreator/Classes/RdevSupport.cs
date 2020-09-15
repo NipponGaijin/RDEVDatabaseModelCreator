@@ -443,7 +443,7 @@ public class RdevDatabaseContext
                 throw new InsertException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
             }
             Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
-            string fieldName = jsonPropertyAttr.PropertyName;
+            string fieldName = jsonPropertyAttr.PropertyName.ToLower();
 
             //Получение атрибута RdevTypeAttribute
             RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
@@ -532,7 +532,7 @@ public class RdevDatabaseContext
                             }
                             Newtonsoft.Json.JsonPropertyAttribute relatedFieldPropJsonPropertyAttr = relatedFieldPropJsonPropertyAttrs[0];
 
-                            if (relatedFieldPropJsonPropertyAttr.PropertyName == "recid")
+                            if (relatedFieldPropJsonPropertyAttr.PropertyName.ToLower() == "recid")
                             {
                                 keys.Add(fieldName);
 
@@ -658,7 +658,7 @@ public class RdevDatabaseContext
                 throw new UpdateException($"Не удалось получить атрибуты JsonProperty у свойства '{prop.Name}'");
             }
             Newtonsoft.Json.JsonPropertyAttribute jsonPropertyAttr = jsonPropertyAttrs[0];
-            string fieldName = jsonPropertyAttr.PropertyName;
+            string fieldName = jsonPropertyAttr.PropertyName.ToLower();
 
             //Получение атрибута RdevTypeAttribute
             RdevTypeAttribute[] rdevTypeAttributes = (RdevTypeAttribute[])System.Attribute.GetCustomAttributes(prop, typeof(RdevTypeAttribute), false);
@@ -742,13 +742,13 @@ public class RdevDatabaseContext
                             }
                             Newtonsoft.Json.JsonPropertyAttribute relatedFieldPropJsonPropertyAttr = relatedFieldPropJsonPropertyAttrs[0];
 
-                            if (relatedFieldPropJsonPropertyAttr.PropertyName == "recid")
+                            if (relatedFieldPropJsonPropertyAttr.PropertyName.ToLower() == "recid")
                             {
 
                                 object propValueSysRelation = relatedFieldProp.GetValue(relatedFieldValue, null);
                                 if (propValueSysRelation != null)
                                 {
-                                    queryParams.Add($"{jsonPropertyAttr.PropertyName} = '{propValueSysRelation}'");
+                                    queryParams.Add($"{jsonPropertyAttr.PropertyName.ToLower()} = '{propValueSysRelation}'");
                                     break;
                                 }
                             }
@@ -957,15 +957,15 @@ public class RdevDatabaseContext
             switch (rdevTypeAttribute.GetType())
             {
                 case RdevTypes.SysString:
-                    string propValueSysString = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName);
+                    string propValueSysString = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName.ToLower());
                     prop.SetValue(resultObject, propValueSysString);
                     break;
                 case RdevTypes.SysInt:
-                    int? propValueSysInt = resultFromDb.Value<int?>(jsonPropertyAttr.PropertyName);
+                    int? propValueSysInt = resultFromDb.Value<int?>(jsonPropertyAttr.PropertyName.ToLower());
                     prop.SetValue(resultObject, propValueSysInt);
                     break;
                 case RdevTypes.SysRelation:
-                    string sysRelationFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName);
+                    string sysRelationFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName.ToLower());
                     if (System.String.IsNullOrEmpty(sysRelationFromDatabase))
                     {
                         break;
@@ -988,7 +988,7 @@ public class RdevDatabaseContext
                     prop.SetValue(resultObject, genericMethodInfo.Invoke(null, new object[] { propValueSysRelation, connection }));
                     break;
                 case RdevTypes.SysDate:
-                    string sysDateFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName);
+                    string sysDateFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName.ToLower());
                     if (System.String.IsNullOrEmpty(sysDateFromDatabase))
                     {
                         break;
@@ -997,7 +997,7 @@ public class RdevDatabaseContext
                     prop.SetValue(resultObject, propValueSysDate);
                     break;
                 case RdevTypes.SysTimeDate:
-                    string sysTimeDateFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName);
+                    string sysTimeDateFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName.ToLower());
                     if (System.String.IsNullOrEmpty(sysTimeDateFromDatabase))
                     {
                         break;
@@ -1008,11 +1008,11 @@ public class RdevDatabaseContext
                 case RdevTypes.SysFile:
                     break;
                 case RdevTypes.SysBoolean:
-                    bool? propValueSysBoolean = resultFromDb.Value<bool?>(jsonPropertyAttr.PropertyName);
+                    bool? propValueSysBoolean = resultFromDb.Value<bool?>(jsonPropertyAttr.PropertyName.ToLower());
                     prop.SetValue(resultObject, propValueSysBoolean);
                     break;
                 case RdevTypes.SysGUID:
-                    string sysGuidFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName);
+                    string sysGuidFromDatabase = resultFromDb.Value<string>(jsonPropertyAttr.PropertyName.ToLower());
                     if (System.String.IsNullOrEmpty(sysGuidFromDatabase))
                     {
                         break;
@@ -1032,11 +1032,11 @@ public class RdevDatabaseContext
                 case RdevTypes.SysENUM:
                     break;
                 case RdevTypes.SysNumber:
-                    int? propValueSysNumber = resultFromDb.Value<int?>(jsonPropertyAttr.PropertyName);
+                    int? propValueSysNumber = resultFromDb.Value<int?>(jsonPropertyAttr.PropertyName.ToLower());
                     prop.SetValue(resultObject, propValueSysNumber);
                     break;
                 case RdevTypes.SysDecimal:
-                    float? propValueSysDecimal = resultFromDb.Value<float?>(jsonPropertyAttr.PropertyName);
+                    float? propValueSysDecimal = resultFromDb.Value<float?>(jsonPropertyAttr.PropertyName.ToLower());
                     prop.SetValue(resultObject, propValueSysDecimal);
                     break;
 
