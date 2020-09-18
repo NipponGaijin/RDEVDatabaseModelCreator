@@ -324,9 +324,10 @@ namespace RDEVDatabaseModelCreator
         private List<RdevTable> ProcessRdevTable(JToken table, JToken tables, JToken types)
         {
             GenerateLogString($"Обработка полей таблицы '{table["name"]}' ('{table["displayName"]}')");
+
             List<RdevTable> rdevTables = new List<RdevTable>();
 
-
+            //Создание экземпляра класса RdevTable с инфой об обрабатываемой таблице
             RdevTable rdevTable = new RdevTable();
             rdevTable.Name = table.Value<string>("name");
             rdevTable.DisplayName = table.Value<string>("displayName");
@@ -338,6 +339,7 @@ namespace RDEVDatabaseModelCreator
                 rdevTables.Add(rdevTable);
                 return rdevTables;
             }
+
 
             foreach (JToken field in fields)
             {
@@ -432,6 +434,10 @@ namespace RDEVDatabaseModelCreator
                             rdevField.RelatedTable = _rdevTables.Find(x => x.Name == relatedTable.Value<string>("name"));
                             rdevTable.AddField(rdevField);
                             continue;
+                        }
+                        else
+                        {
+                            _rdevTables.Add(rdevTable);
                         }
 
                         var relatedTables = ProcessRdevTable(relatedTable, tables, types);
